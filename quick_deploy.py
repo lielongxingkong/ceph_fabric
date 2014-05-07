@@ -2,6 +2,7 @@
 # encoding: utf-8
 
 from fabric.api import *
+import os
 
 host_ip_map =  {
 	'node1' : "192.168.1.21",	
@@ -50,6 +51,9 @@ HOSTNAME_CONF = "/etc/sysconfig/network"
 DEPLOY_CONF_DIR = "/home/ceph/my_cluster"
 HOSTS_CONF = "/etc/hosts"
 OSD_PATH = "/var/local/"
+AUTH_KEYS = "./authorized_keys"
+
+os.system("echo > %s" % AUTH_KEYS)
 
 osd_map = " " . join("%s:%s%s" % (k, OSD_PATH, v) for k, v in osds.items())
 
@@ -91,6 +95,23 @@ def add_user():
 	run("chmod 0440 /etc/sudoers.d/ceph")
 	run("sed -i 's/^Defaults.*requiretty/#[comment by ceph]&/' /etc/sudoers")
 
+@roles('all')
+def ssh_keygen():
+	run("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
+	key = run("cat ~/.ssh/id_rsa.pub")
+	f = open(AUTH_KEYS, 'a')
+	f.write(key + "\n")
+	f.close()
+
+@roles('all')
+def dispatch_auth_key():
+	put(AUTH_KEYS, '~/.ssh/authorized_keys')
+	run('chmod 600 ~/.ssh/authorized_keys')
+
+@roles('all')
+def clean_auth_key():
+	run('rm -f /home/ceph/.ssh/*')
+	 
 @roles('deploy')
 def install_deploy():
 	put('./ceph.repo', '/etc/yum.repos.d/ceph.repo')
@@ -118,7 +139,7 @@ def initial_monitors():
 
 @roles('osd')
 def create_osd_dir():
-	run('mkdir -p %s%s' % (OSD_PATH, osds[env.host])) 
+	sudo('mkdir -p %s%s' % (OSD_PATH, osds[env.host])) 
 	run('ls %s' % OSD_PATH)
 
 @roles('osd')
@@ -126,11 +147,11 @@ def remove_osd_dir():
 	run('rm -fr %s%s' % (OSD_PATH, osds[env.host]))
 	run('ls %s' % OSD_PATH)
 
-@roles('osd')
+@roles('deploy')
 def prepare_osd():
 	run('ceph-deploy osd prepare %s' % osd_map)
 
-@roles('osd')
+@roles('deploy')
 def activate_osd():
 	run('ceph-deploy osd activate %s' % osd_map)
 
@@ -164,21 +185,26 @@ def init():
 	execute(add_user)
 	execute(install_deploy)
 
+def make_auth():
+	with settings(user='ceph', password='ceph'):
+		execute(ssh_keygen)
+		execute(dispatch_auth_key)
+
 def deploy_ceph():
 	with settings(user='ceph', password='ceph'):
 		execute(create_config_dir)
 		execute(create_cluster)
 		execute(install_ceph)
 		execute(initial_monitors)
-		#create_osd_dir)
-		#prepare_osd)
-		#activate_osd)
-		#dispatch_conf)
+		execute(create_osd_dir)
+		execute(prepare_osd)
+		execute(activate_osd)
+		execute(dispatch_conf)
 
 def purge_ceph_data():
-	execute(purge_data)
+	execute(purgedata)
 
-def purge_ceph_package():
+def purge_ceph_keys():
 	execute(forgetkeys)
 
 def purge_ceph_all():
