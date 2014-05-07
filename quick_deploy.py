@@ -149,11 +149,13 @@ def remove_osd_dir():
 
 @roles('deploy')
 def prepare_osd():
-	run('ceph-deploy osd prepare %s' % osd_map)
+	with cd(DEPLOY_CONF_DIR):
+		run('ceph-deploy osd prepare %s' % osd_map)
 
 @roles('deploy')
 def activate_osd():
-	run('ceph-deploy osd activate %s' % osd_map)
+    with cd(DEPLOY_CONF_DIR):
+		run('ceph-deploy osd activate %s' % osd_map)
 
 @roles('deploy')
 def dispatch_conf():
