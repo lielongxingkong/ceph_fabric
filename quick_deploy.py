@@ -186,9 +186,12 @@ def init():
 	execute(install_deploy)
 
 def make_auth():
+	execute(ssh_keygen)
+	execute(dispatch_auth_key)
+
+def make_ceph_auth():
 	with settings(user='ceph', password='ceph'):
-		execute(ssh_keygen)
-		execute(dispatch_auth_key)
+		make_auth()
 
 def deploy_ceph():
 	with settings(user='ceph', password='ceph'):
