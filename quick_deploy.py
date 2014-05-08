@@ -89,6 +89,10 @@ def _add_user():
 	run("chmod 0440 /etc/sudoers.d/ceph")
 	run("sed -i 's/^Defaults.*requiretty/#[comment by ceph]&/' /etc/sudoers")
 
+@roles('local')
+def _deploy_ssh_keygen():
+    _ssh_keygen()
+
 @roles('storage')
 def _ssh_keygen():
 	run("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
@@ -170,6 +174,7 @@ def _purge():
 #tasks
 def init_deploy():
 	execute(_set_deploy_hosts)
+	execute(_deploy_ssh_keygen)
 
 def init():
 	execute(_set_hosts)
