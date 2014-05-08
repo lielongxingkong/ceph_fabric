@@ -68,20 +68,20 @@ def _debug():
 	run("test " + OSD_PATH + osds[env.host])
 
 @roles('storage')
-def set_hosts():
+def _set_hosts():
 	hosts = "\n" . join(["%s\t%s" % (v, k) for (k, v) in host_ip_map.items()]) + "\n"
 	run('printf %s >> /etc/hosts' % repr(hosts))
 
 @roles('deploy')
-def set_deploy_hosts():
-	set_hosts()
+def _set_deploy_hosts():
+	_set_hosts()
 
 @roles('all')
-def hostname():
+def _hostname():
 	run('hostname %s' % env.host)
 
 @roles('all')
-def add_user():
+def _add_user():
 	run('useradd -d /home/ceph -m ceph')
 	run("echo 'ceph' | passwd ceph --stdin")
 	run("echo 'ceph ALL = (root) NOPASSWD:ALL' | tee /etc/sudoers.d/ceph")
@@ -89,7 +89,7 @@ def add_user():
 	run("sed -i 's/^Defaults.*requiretty/#[comment by ceph]&/' /etc/sudoers")
 
 @roles('storage')
-def ssh_keygen():
+def _ssh_keygen():
 	run("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
 	key = run("cat ~/.ssh/id_rsa.pub")
 	f = open(AUTH_KEYS, 'a')
@@ -97,7 +97,7 @@ def ssh_keygen():
 	f.close()
 
 @roles('storage')
-def dispatch_auth_key():
+def _dispatch_auth_key():
 	put(AUTH_KEYS, '~/.ssh/authorized_keys')
 	run('chmod 600 ~/.ssh/authorized_keys')
 
@@ -106,82 +106,79 @@ def clean_auth_key():
 	run('rm -f /home/ceph/.ssh/*')
 
 @roles('deploy')
-def install_deploy():
+def _install_deploy():
 	put('./ceph.repo', '/etc/yum.repos.d/ceph.repo')
 	run('yum makecache && yum install ceph-deploy')
 
 @roles('deploy')
-def create_config_dir():
+def _create_config_dir():
 	run('mkdir -p %s' % DEPLOY_CONF_DIR)
 
 @roles('deploy')
-def create_cluster():
+def _create_cluster():
     with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy new %s' % monitor_list)
 
 @roles('deploy')
-def install_ceph():
+def _install_ceph():
     with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy install %s' % storage_list)
 
 @roles('deploy')
-def initial_monitors():
+def _initial_monitors():
     with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy mon create-initial')
 
 @roles('osd')
-def create_osd_dir():
+def _create_osd_dir():
 	sudo('mkdir -p %s%s' % (OSD_PATH, osds[env.host]))
 	run('ls %s' % OSD_PATH)
 
 @roles('osd')
-def remove_osd_dir():
+def _remove_osd_dir():
 	run('rm -fr %s%s' % (OSD_PATH, osds[env.host]))
 	run('ls %s' % OSD_PATH)
 
 @roles('deploy')
-def prepare_osd():
+def _prepare_osd():
 	with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy osd prepare %s' % osd_map)
 
 @roles('deploy')
-def activate_osd():
+def _activate_osd():
     with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy osd activate %s' % osd_map)
 
 @roles('deploy')
-def dispatch_conf():
+def _dispatch_conf():
     with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy admin %s' % storage_list)
 
 @roles('deploy')
-def purgedata():
+def _purgedata():
 	run('ceph-deploy purgedata %s' % storage_list)
 
 @roles('deploy')
-def forgetkeys():
+def _forgetkeys():
 	run('ceph-deploy forgetkeys')
 
 @roles('deploy')
-def purge():
+def _purge():
 	run('ceph-deploy purge %s' % storage_list)
 
 #tasks
-def set_hostname():
-	execute(hostname)
-
 def init_local():
-	execute(set_local_hosts)
+	execute(_set_deploy_hosts)
 
 def init():
-	execute(set_hosts)
-	execute(hostname)
-	execute(add_user)
+	execute(_set_hosts)
+	execute(_hostname)
+	execute(_add_user)
 	execute(install_deploy)
 
 def make_auth():
-	execute(ssh_keygen)
-	execute(dispatch_auth_key)
+	execute(_ssh_keygen)
+	execute(_dispatch_auth_key)
 
 def make_ceph_auth():
 	with settings(user='ceph', password='ceph'):
@@ -189,25 +186,25 @@ def make_ceph_auth():
 
 def deploy_ceph():
 	with settings(user='ceph', password='ceph'):
-		execute(create_config_dir)
-		execute(create_cluster)
-		execute(install_ceph)
-		execute(initial_monitors)
-		execute(create_osd_dir)
-		execute(prepare_osd)
-		execute(activate_osd)
-		execute(dispatch_conf)
+		execute(_create_config_dir)
+		execute(_create_cluster)
+		execute(_install_ceph)
+		execute(_initial_monitors)
+		execute(_create_osd_dir)
+		execute(_prepare_osd)
+		execute(_activate_osd)
+		execute(_dispatch_conf)
 
 def purge_ceph_data():
-	execute(purgedata)
+	execute(_purgedata)
 
 def purge_ceph_keys():
-	execute(forgetkeys)
+	execute(_forgetkeys)
 
 def purge_ceph_all():
-	execute(purge)
+	execute(_purge)
 
 def debug():
-	execute(create_osd_dir)
-	execute(remove_osd_dir)
+	execute(_create_osd_dir)
+	execute(_remove_osd_dir)
 	#execute(_debug)
