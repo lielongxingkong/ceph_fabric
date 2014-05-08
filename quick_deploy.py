@@ -180,7 +180,7 @@ def init():
 	execute(_set_hosts)
 	execute(_hostname)
 	execute(_add_user)
-	execute(install_deploy)
+	execute(_install_deploy)
 
 def make_auth():
 	execute(_ssh_keygen)
