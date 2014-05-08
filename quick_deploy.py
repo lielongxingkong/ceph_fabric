@@ -4,40 +4,53 @@
 from fabric.api import *
 import os
 
+HOSTNAME_CONF = "/etc/sysconfig/network"
+DEPLOY_CONF_DIR = "/home/ceph/my_cluster"
+HOSTS_CONF = "/etc/hosts"
+OSD_PATH = "/var/local/"
+AUTH_KEYS = "./authorized_keys"
+
+cmd = "if [ -f ~/.ssh/id_rsa.pub ];then cat ~/.ssh/id_rsa.pub > %s; \
+                    else echo > %s; fi" % (AUTH_KEYS, AUTH_KEYS)
+
+os.system(cmd)
+
 host_ip_map =  {
-	'node1' : "192.168.1.21",	
-	'node2' : "192.168.1.22",	
-	'node3' : "192.168.1.23",	
-	'deploy' : '192.168.1.11',	
+	'node1' : "192.168.1.21",
+	'node2' : "192.168.1.22",
+	'node3' : "192.168.1.23",
+	'deploy' : '192.168.1.11',
 }
 
-all = host_ip_map.keys()
-nodes = [ i for i in host_ip_map.keys() if i != 'deploy']
+all_nodes = host_ip_map.keys()
+storage_nodes = [ i for i in host_ip_map.keys() if i != 'deploy']
 monitors = ['node1', 'node2', 'node3']
 osds = {
-	'node1' : 'osd0', 
-	'node2' : 'osd1', 
-	'node3' : 'osd2', 
+	'node1' : 'osd0',
+	'node2' : 'osd1',
+	'node3' : 'osd2',
 }
 osd_names = osds.values()
 osd_nodes = osds.keys()
 deploy = ['deploy']
 debug = ['node1']
 
-all_list = " " . join(all)
-node_list = " " . join(nodes)
+all_list = " " . join(all_nodes)
+storage_list = " " . join(storage_nodes)
 monitor_list = " " . join(monitors)
 osd_name_list = " " . join(osd_names)
-osd_node_list = " " . join(osd_nodes)
+osd_list = " " . join(osd_nodes)
 
+# set(all) = set(storage) + set(deploy)
+# set(osd) in set(storage)
+# set(monitor) in set(storage)
 env.roledefs = {
-	'all' : all, 
-	'node' : nodes, 
-	'deploy' : deploy, 
+	'all' : all_nodes,
+	'storage' : storage_nodes,
+	'deploy' : deploy,
 	'monitor' : monitors,
 	'osd' : osd_nodes,
 	'debug' : debug,
-	'local' : ['localhost'],
 }
 
 passwd_dict = {
@@ -47,47 +60,27 @@ passwd_dict = {
 env.user = "root"
 env.password = passwd_dict['root']
 
-HOSTNAME_CONF = "/etc/sysconfig/network"
-DEPLOY_CONF_DIR = "/home/ceph/my_cluster"
-HOSTS_CONF = "/etc/hosts"
-OSD_PATH = "/var/local/"
-AUTH_KEYS = "./authorized_keys"
-
-os.system("echo > %s" % AUTH_KEYS)
-
 osd_map = " " . join("%s:%s%s" % (k, OSD_PATH, v) for k, v in osds.items())
 
-'''
-print "node_list: ", node_list
-print "monitor_list: ", monitor_list
-print "osd_name_list: ", osd_name_list
-print "osd_node_list: ", osd_node_list
-for k,v in env.roledefs.items():
-	print str(k) + " => " + str(v)
-'''
-
-#functions 
-
-#sub-tasks
-
+#functions
 @roles('debug')
 def _debug():
 	run("test " + OSD_PATH + osds[env.host])
 
-@roles('node')
+@roles('storage')
 def set_hosts():
 	hosts = "\n" . join(["%s\t%s" % (v, k) for (k, v) in host_ip_map.items()]) + "\n"
 	run('printf %s >> /etc/hosts' % repr(hosts))
 
-@roles('local')
-def set_local_hosts():
-	set_hosts() 
+@roles('deploy')
+def set_deploy_hosts():
+	set_hosts()
 
-@roles('node', 'deploy')
+@roles('all')
 def hostname():
 	run('hostname %s' % env.host)
 
-@roles('node', 'deploy')
+@roles('all')
 def add_user():
 	run('useradd -d /home/ceph -m ceph')
 	run("echo 'ceph' | passwd ceph --stdin")
@@ -95,7 +88,7 @@ def add_user():
 	run("chmod 0440 /etc/sudoers.d/ceph")
 	run("sed -i 's/^Defaults.*requiretty/#[comment by ceph]&/' /etc/sudoers")
 
-@roles('all')
+@roles('storage')
 def ssh_keygen():
 	run("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
 	key = run("cat ~/.ssh/id_rsa.pub")
@@ -103,15 +96,15 @@ def ssh_keygen():
 	f.write(key + "\n")
 	f.close()
 
-@roles('all')
+@roles('storage')
 def dispatch_auth_key():
 	put(AUTH_KEYS, '~/.ssh/authorized_keys')
 	run('chmod 600 ~/.ssh/authorized_keys')
 
-@roles('all')
+@roles('storage')
 def clean_auth_key():
 	run('rm -f /home/ceph/.ssh/*')
-	 
+
 @roles('deploy')
 def install_deploy():
 	put('./ceph.repo', '/etc/yum.repos.d/ceph.repo')
@@ -125,12 +118,11 @@ def create_config_dir():
 def create_cluster():
     with cd(DEPLOY_CONF_DIR):
 		run('ceph-deploy new %s' % monitor_list)
-		run('ls')
 
 @roles('deploy')
 def install_ceph():
     with cd(DEPLOY_CONF_DIR):
-		run('ceph-deploy install %s' % node_list)
+		run('ceph-deploy install %s' % storage_list)
 
 @roles('deploy')
 def initial_monitors():
@@ -139,7 +131,7 @@ def initial_monitors():
 
 @roles('osd')
 def create_osd_dir():
-	sudo('mkdir -p %s%s' % (OSD_PATH, osds[env.host])) 
+	sudo('mkdir -p %s%s' % (OSD_PATH, osds[env.host]))
 	run('ls %s' % OSD_PATH)
 
 @roles('osd')
@@ -160,11 +152,11 @@ def activate_osd():
 @roles('deploy')
 def dispatch_conf():
     with cd(DEPLOY_CONF_DIR):
-		run('ceph-deploy admin %s' % node_list)
+		run('ceph-deploy admin %s' % storage_list)
 
 @roles('deploy')
 def purgedata():
-	run('ceph-deploy purgedata %s' % node_list)
+	run('ceph-deploy purgedata %s' % storage_list)
 
 @roles('deploy')
 def forgetkeys():
@@ -172,7 +164,7 @@ def forgetkeys():
 
 @roles('deploy')
 def purge():
-	run('ceph-deploy purge %s' % node_list)
+	run('ceph-deploy purge %s' % storage_list)
 
 #tasks
 def set_hostname():
@@ -180,7 +172,7 @@ def set_hostname():
 
 def init_local():
 	execute(set_local_hosts)
-	
+
 def init():
 	execute(set_hosts)
 	execute(hostname)
@@ -219,4 +211,3 @@ def debug():
 	execute(create_osd_dir)
 	execute(remove_osd_dir)
 	#execute(_debug)
-
