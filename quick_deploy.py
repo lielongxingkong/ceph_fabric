@@ -51,6 +51,7 @@ env.roledefs = {
 	'monitor' : monitors,
 	'osd' : osd_nodes,
 	'debug' : debug,
+    'local' : ['localhost']
 }
 
 passwd_dict = {
@@ -72,7 +73,7 @@ def _set_hosts():
 	hosts = "\n" . join(["%s\t%s" % (v, k) for (k, v) in host_ip_map.items()]) + "\n"
 	run('printf %s >> /etc/hosts' % repr(hosts))
 
-@roles('deploy')
+@roles('local')
 def _set_deploy_hosts():
 	_set_hosts()
 
@@ -167,7 +168,7 @@ def _purge():
 	run('ceph-deploy purge %s' % storage_list)
 
 #tasks
-def init_local():
+def init_deploy():
 	execute(_set_deploy_hosts)
 
 def init():
