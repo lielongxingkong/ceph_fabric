@@ -93,6 +93,10 @@ def _add_user():
 def _deploy_ssh_keygen():
     _ssh_keygen()
 
+@roles('all')
+def _ceph_ssh_keygen():
+    _ssh_keygen()
+
 @roles('storage')
 def _ssh_keygen():
 	run("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
@@ -100,6 +104,10 @@ def _ssh_keygen():
 	f = open(AUTH_KEYS, 'a')
 	f.write(key + "\n")
 	f.close()
+
+@roles('all')
+def _dispatch_ceph_auth_key():
+    _dispatch_auth_key()
 
 @roles('storage')
 def _dispatch_auth_key():
@@ -188,7 +196,8 @@ def make_auth():
 
 def make_ceph_auth():
 	with settings(user='ceph', password='ceph'):
-		make_auth()
+	    execute(_ceph_ssh_keygen)
+	    execute(_dispatch_ceph_auth_key)
 
 def deploy_ceph():
 	with settings(user='ceph', password='ceph'):
