@@ -9,3 +9,8 @@ git config --global user.email zzl_1164@126.com
 git config --global alias.st status
 git config --global alias.br branch 
 git config --global alias.dif diff 
+
+yum install -y ntp
+echo "server 127.127.0.1\nrestrict 192.168.0.0 255.255.0.0\nfudge 127.127.0.1 stratum 10" >> /etc/ntp.conf
+service ntpd start 
+
