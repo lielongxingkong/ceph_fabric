@@ -192,10 +192,13 @@ def init_deploy():
 	execute(_deploy_ssh_keygen)
 
 def init():
-	execute(_set_hosts)
 	execute(_hostname)
+	execute(_set_hosts)
 	execute(_add_user)
 	execute(_install_deploy)
+
+def hostname():
+	execute(_hostname)
 
 def make_auth():
 	execute(_ssh_keygen)
