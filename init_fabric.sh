@@ -11,6 +11,6 @@ git config --global alias.br branch
 git config --global alias.dif diff 
 
 yum install -y ntp
-echo "server 127.127.1.0\nrestrict 192.168.0.0 mask 255.255.0.0 nomodify\nfudge 127.127.1.0 stratum 0 stratum" >> /etc/ntp.conf
+printf "server 127.127.1.0\nrestrict 192.168.0.0 mask 255.255.0.0 nomodify\nfudge 127.127.1.0 stratum 0 stratum" >> /etc/ntp.conf
 service ntpd start 
 
