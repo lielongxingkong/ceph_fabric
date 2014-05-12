@@ -13,13 +13,15 @@ AUTH_KEYS = "./authorized_keys"
 cmd = "if [ -f ~/.ssh/id_rsa.pub ];then cat ~/.ssh/id_rsa.pub > %s; \
                     else echo > %s; fi" % (AUTH_KEYS, AUTH_KEYS)
 
+set_eth1_cmd = "ifconfig eth1 %s broadcast 192.168.3.255 netmask 255.255.255.0"
+
 os.system(cmd)
 
 host_ip_map =  {
-	'node1' : "192.168.1.21",
-	'node2' : "192.168.1.22",
-	'node3' : "192.168.1.23",
-	'deploy' : '192.168.1.11',
+	'node1' : ['192.168.1.21', '192.168.3.21'],
+	'node2' : ['192.168.1.22', '192.168.3.22'],
+	'node3' : ['192.168.1.23', '192.168.3.23'],
+	'deploy' : ['192.168.1.11', '192.168.3.11'],
 }
 
 all_nodes = host_ip_map.keys()
@@ -70,7 +72,7 @@ def _debug():
 
 @roles('storage')
 def _set_hosts():
-	hosts = "\n" . join(["%s\t%s" % (v, k) for (k, v) in host_ip_map.items()]) + "\n"
+	hosts = "\n" . join(["%s\t%s" % (v[0], k) for (k, v) in host_ip_map.items()]) + "\n"
 	run('printf %s >> /etc/hosts' % repr(hosts))
 
 @roles('local')
@@ -97,6 +99,11 @@ def _deploy_ssh_keygen():
 def _ceph_ssh_keygen():
     _ssh_keygen()
 
+@roles('all')
+def set_eth1():
+	run(set_eth1_cmd % host_ip_map[env.host][1])
+	
+
 @roles('storage')
 def _ssh_keygen():
 	run("ssh-keygen -t rsa -N '' -f ~/.ssh/id_rsa")
@@ -121,7 +128,7 @@ def clean_auth_key():
 @roles('deploy')
 def _install_deploy():
 	put('./ceph.repo', '/etc/yum.repos.d/ceph.repo')
-	run('yum makecache && yum install ceph-deploy')
+	run('yum makecache && yum -y install ceph-deploy')
 
 @roles('deploy')
 def _create_config_dir():
