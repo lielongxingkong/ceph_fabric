@@ -81,7 +81,8 @@ def _set_deploy_hosts():
 
 @roles('all')
 def _hostname():
-	run('hostname %s' % env.host)
+    run('hostname %s' % env.host)
+    run('echo "NETWORKING=yes\nHOSTNAME=%s" > /etc/sysconfig/network' % env.host)
 
 @roles('all')
 def _add_user():
@@ -102,7 +103,7 @@ def _ceph_ssh_keygen():
 @roles('all')
 def set_eth1():
 	run(set_eth1_cmd % host_ip_map[env.host][1])
-	
+
 
 @roles('storage')
 def _ssh_keygen():
